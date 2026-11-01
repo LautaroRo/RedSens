@@ -1,0 +1,101 @@
+INFORME DE RENDIMIENTO - RedSens
+Grupo 2 - semilla 2026 - tabla hash inicial 13 - base Villa María - M de Josephus 2
+Generado: 01/11/2026 18:01 - Java 25.0.2
+
+
+====================================
+M6 - Generador de números aleatorios
+====================================
+secuenciasIguales(2026, 1000)        = true
+secuenciasDistintas(2026, 2027, 1000) = true
+Primeros 5 valores nextInt(101):
+  semilla 2026     :  97  96  26  54  36
+  semilla 2026 (2.º):  97  96  26  54  36
+  semilla 2027     :  27  63  22  23   3
+
+Uniformidad de la batería (0 a 100) con 1.000.000 muestras, semilla 2026
+  Intervalo   Observado   Esperado    Desvío
+    0 -   9       99036      99010     0,03%
+   10 -  19       99049      99010     0,04%
+   20 -  29       99021      99010     0,01%
+   30 -  39       99030      99010     0,02%
+   40 -  49       98801      99010    -0,21%
+   50 -  59       98998      99010    -0,01%
+   60 -  69       99506      99010     0,50%
+   70 -  79       98949      99010    -0,06%
+   80 -  89       98677      99010    -0,34%
+   90 - 100      108933     108911     0,02%
+  Por valor: esperado 9901,0 apariciones, desvío máximo 2,35%
+  Chi-cuadrado = 84,15 (100 grados de libertad, crítico al 5% = 124,34) -> no se rechaza la uniformidad
+
+===============
+M1 - Tabla hash
+===============
+Experimento M1 - 10.000 estaciones, tamaño inicial 13
+Configuración                                     Tamaño      λ Rehash Colisiones    Éxito  Fracaso  Teór. É  Teór. F  ns/busq.
+Lineal, umbral 0,50                                33703  0,297     11      7.707    1,205    1,494    1,211    1,511      70,3
+Cuadrática, umbral 0,50                            33703  0,297     11      6.546    1,197    1,451    1,186    1,422      60,5
+Encadenamiento, umbral 1,00                        16843  0,594     10      5.052    1,302    0,592    1,297    0,594      46,5
+Lineal, umbral 0,90                                16843  0,594     10     68.415    1,789    3,728    1,731    3,529      55,0
+Cuadrática, umbral 0,90                            16843  0,594     10     27.977    1,600    2,681    1,517    2,461      54,9
+Lineal, umbral 0,50 [Horner sin mezcla]            33703  0,297     11     18.585    3,112    2,339    1,211    1,511      67,6
+Lineal, umbral 0,90 [Horner sin mezcla]            16843  0,594     10    255.299    2,202   11,672    1,731    3,529      40,1
+Lineal, umbral 0,50 [suma de caracteres]           33703  0,297     11 49.815.000 4982,500 9914,000        -        -   27381,3
+Éxito / Fracaso: sondeos promedio medidos por búsqueda exitosa y no exitosa.
+Teór.: lineal ½(1+1/(1-λ)) y ½(1+1/(1-λ)²); cuadrática ≈ -ln(1-λ)/λ y 1/(1-λ); encadenamiento 1+λ/2 y λ (nodos comparados).
+
+===================
+M2 - ABB contra AVL
+===================
+Experimento M2 - altura y tiempo de búsqueda (se buscan todas las claves, en orden mezclado)
+Orden             N Árbol  Altura       log2(N)       Inserción   Búsqueda prom.
+ascendente    1.000 ABB       999          9,97       5294,1 µs           556 ns
+ascendente    1.000 AVL         9          9,97        401,7 µs            55 ns
+ascendente    5.000 ABB      4999         12,29         19,6 ms          2851 ns
+ascendente    5.000 AVL        12         12,29        706,7 µs            81 ns
+ascendente   10.000 ABB      9999         13,29         56,7 ms          5548 ns
+ascendente   10.000 AVL        13         13,29       1658,0 µs            79 ns
+aleatorio     1.000 ABB        19          9,97         59,8 µs            11 ns
+aleatorio     1.000 AVL        11          9,97        211,6 µs            11 ns
+aleatorio     5.000 ABB        25         12,29        356,9 µs            45 ns
+aleatorio     5.000 AVL        13         12,29        600,4 µs            49 ns
+aleatorio    10.000 ABB        28         13,29       1019,5 µs            61 ns
+aleatorio    10.000 AVL        15         13,29       1996,8 µs            62 ns
+Altura en aristas (una hoja sola tiene altura 0). Cota del AVL: altura < 1,44*log2(N+2).
+
+==============================================
+M4 - Caso de verificación de Huffman: WWXWYZWX
+==============================================
+  Símbolo   Frecuencia  Código                Bits
+  'W'                4  0                        1
+  'X'                2  10                       2
+  'Y'                1  110                      3
+  'Z'                1  111                      3
+
+Símbolos distintos: 4
+Ningún código es prefijo de otro: sí
+Tamaño original (8 bits por carácter): 64 bits
+Tamaño comprimido:                     14 bits
+Bits promedio por carácter:            1,750
+Tasa de compresión: 21,88% del original (ahorro del 78,13%)
+Decodificado idéntico al original: sí
+
+=============
+M5 - Josephus
+=============
+Caso de verificación N = 5, M = 1 (esperado: salen 2, 4, 1, 5 y queda 3)
+  Lista + iterador: [2, 4, 1, 5, 3] -> correcto
+  Árbol con rangos: [2, 4, 1, 5, 3] -> correcto
+
+Experimento M5 - tiempo de las dos implementaciones de Josephus
+       N      M     Lista O(N*M) Árbol O(N log N)   Cociente     Último
+   1.000      2         246,3 µs          92,0 µs       2,7x        604
+  10.000      2         576,4 µs         998,8 µs       0,6x       2692
+ 100.000      2        2667,0 µs        5532,9 µs       0,5x      92620
+   1.000    100         362,5 µs          52,0 µs       7,0x        320
+  10.000    100        2008,8 µs         625,0 µs       3,2x       6810
+ 100.000    100          30,7 ms          10,2 ms       3,0x       8373
+   1.000   1000        3701,2 µs          39,4 µs      93,9x        154
+  10.000   1000          20,2 ms         663,7 µs      30,4x       4342
+ 100.000   1000         281,6 ms          10,0 ms      28,1x      12442
+Cociente = tiempo lista / tiempo árbol (mayor que 1: el árbol es más rápido).

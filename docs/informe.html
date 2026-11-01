@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Informe técnico RedSens</title>
+<style>
+  @page { size: A4; margin: 18mm 17mm 18mm 17mm; }
+  body { font-family: "Segoe UI", Arial, sans-serif; font-size: 10.3pt; line-height: 1.42; color: #1d1d1f; }
+  h1 { font-size: 22pt; margin: 0 0 4pt; }
+  h2 { font-size: 14pt; margin: 18pt 0 6pt; padding-bottom: 3pt; border-bottom: 2px solid #2a5d8f; color: #1f4a73; page-break-after: avoid; }
+  h3 { font-size: 11.5pt; margin: 12pt 0 4pt; color: #1f4a73; page-break-after: avoid; }
+  p { margin: 4pt 0 6pt; text-align: justify; }
+  table { border-collapse: collapse; width: 100%; margin: 6pt 0 8pt; font-size: 9pt; page-break-inside: avoid; }
+  th, td { border: 1px solid #c9d3de; padding: 3pt 5pt; text-align: left; vertical-align: top; }
+  th { background: #e8eef5; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+  code, pre { font-family: Consolas, "Courier New", monospace; font-size: 8.8pt; }
+  pre { background: #f5f7fa; border: 1px solid #dde3ea; padding: 6pt 8pt; white-space: pre-wrap; page-break-inside: avoid; margin: 6pt 0; }
+  .aviso { border: 2px solid #c0392b; background: #fdecea; padding: 8pt 10pt; margin: 10pt 0; }
+  .nota { background: #eef4fb; border-left: 4px solid #2a5d8f; padding: 6pt 9pt; margin: 8pt 0; }
+  .portada { height: 245mm; display: flex; flex-direction: column; justify-content: center; page-break-after: always; }
+  .portada .sub { font-size: 13pt; color: #444; }
+  .salto { page-break-before: always; }
+  ul, ol { margin: 3pt 0 6pt 16pt; padding: 0; }
+  li { margin: 1.5pt 0; }
+  .peq { font-size: 8.8pt; color: #555; }
+</style>
+</head>
+<body>
+
+<div class="portada">
+  <div class="sub">Taller de Algoritmos y Estructura de Datos II · Universidad Siglo 21</div>
+  <h1>RedSens</h1>
+  <div class="sub">Sistema de gestión y mantenimiento de la red provincial de estaciones de medición de DATA Investigaciones</div>
+  <p style="margin-top:24pt"><b>Informe técnico · Trabajo Práctico Integral</b></p>
+  <table style="width:70%; margin-top:10pt">
+    <tr><th>Grupo</th><td>2</td></tr>
+    <tr><th>Parámetros</th><td>Semilla 2026 · tabla hash inicial 13 · base Villa María · M de Josephus 2</td></tr>
+    <tr><th>Lenguaje</th><td>Java 17 (aplicación de consola, sin librerías externas)</td></tr>
+    <tr><th>Integrantes</th><td>Valentino · Bruno A · Nacho · Lautaro · Bruno B · Aitana</td></tr>
+  </table>
+</div>
+
+<h2>1. Descripción de la solución</h2>
+<p>RedSens es una aplicación de consola organizada en un paquete por módulo. Los seis módulos comparten el
+modelo <code>Estacion</code> y funcionan como un único sistema desde el menú principal (<code>redsens.Main</code>):</p>
+<table>
+  <tr><th>Paquete</th><th>Responsabilidad</th><th>Clases principales</th></tr>
+  <tr><td>modelo</td><td>Datos de una estación y parámetros del grupo</td><td>Estacion, Parametros</td></tr>
+  <tr><td>m1</td><td>Búsqueda, alta y baja por código en O(1) promedio</td><td>TablaHash, TablaHashEncadenada, ExperimentoHash</td></tr>
+  <tr><td>m2</td><td>Índice ordenado por número: orden, rangos, críticas</td><td>ArbolBinarioBusqueda, ABB, AVL, ExperimentoArboles</td></tr>
+  <tr><td>m3</td><td>Red vial y recorridos de las cuadrillas</td><td>Grafo, GrafoMatriz, GrafoLista, AlgoritmosGrafo, PlanVisitas</td></tr>
+  <tr><td>m4</td><td>Compresión sin pérdida del archivo de mediciones</td><td>Huffman, ArchivoHuffman</td></tr>
+  <tr><td>m5</td><td>Calendario de guardias justo y verificable</td><td>JosephusSimple, JosephusArbol, ArbolRango, Guardias</td></tr>
+  <tr><td>m6</td><td>Datos simulados reproducibles y medición de rendimiento</td><td>GeneradorDatos, PruebasAleatorios, Cronometro, InformeRendimiento</td></tr>
+</table>
+<p><b>Flujo integrado.</b> «Cargar la red» genera N estaciones con la semilla del grupo (M6) y las inserta a la vez en
+la tabla hash (M1) y en el AVL (M2). La tabla hash atiende las búsquedas por código; el AVL, los listados en orden,
+los rangos y el reporte de críticas. Ese reporte se agrupa por localidad y alimenta el plan de visitas del M3, que usa la
+tabla de distancias de Floyd. El M4 genera el archivo de mediciones a partir de las estaciones cargadas, y el M6
+reúne los experimentos de M1, M2 y M5 en un informe de rendimiento que el programa guarda en un archivo.</p>
+<p><b>Por qué dos estructuras para los mismos datos.</b> La tabla hash es la mejor para «¿dónde está CBA-0347?»
+(O(1) promedio), pero desordena las claves a propósito: no sirve para listar en orden ni por rango. El AVL resuelve eso
+en O(log n + k) a cambio de búsquedas O(log n). Mantener ambas cuesta el doble de inserciones, pero cada consulta
+usa la estructura que le conviene.</p>
+<p><b>Restricciones.</b> M1, M2 y M3 no usan <code>HashMap</code>, <code>TreeMap</code> ni librerías de grafos:
+la tabla, los árboles, las listas de adyacencia y la cola del BFS están implementadas con arreglos y nodos propios.</p>
+
+<h2>2. M1 · Registro de estaciones (tabla hash)</h2>
+<h3>Diseño</h3>
+<ul>
+  <li><b>Direccionamiento abierto</b> con un arreglo de celdas. Cada celda guarda la estación y un indicador
+  <code>activa</code>. La estrategia (lineal o cuadrática) se elige al crear la tabla.</li>
+  <li><b>Exploración lineal:</b> h, h+1, h+2, … <b>Cuadrática:</b> h, h+1, h+4, h+9, …, calculada de forma
+  incremental (i² − (i−1)² = 2i − 1) para evitar multiplicaciones y desbordes.</li>
+  <li><b>Eliminación perezosa:</b> la celda se marca como borrada y no se vacía. Si se vaciara, una búsqueda de una
+  clave que se insertó después, y que tuvo que saltar esa celda, cortaría la secuencia de sondeo y la daría por
+  inexistente. Las celdas borradas siguen contando como ocupadas para el factor de carga y se descartan en el rehashing.</li>
+  <li><b>Rehashing:</b> cuando las celdas ocupadas superan <code>umbral × tamaño</code>, la tabla pasa al primer primo
+  mayor o igual que el doble y se reinsertan solo las activas. Con tamaño inicial 13: 13 → 29 → 59 → … → 33.703.</li>
+  <li><b>Contadores:</b> colisiones acumuladas en las inserciones (cada celda ocupada por otra clave que se encuentra en
+  el camino) y sondeos de la última operación (celdas examinadas).</li>
+</ul>
+<h3>Función hash</h3>
+<pre>h = 0
+para cada carácter c del código:  h = 31·h + c      // Horner: CBA-1234 ≠ CBA-4321
+h ^= h &gt;&gt;&gt; 16;  h *= 0x45d9f3b;  h ^= h &gt;&gt;&gt; 16       // mezcla de bits
+posición = floorMod(h, tamaño)                      // tamaño primo; floorMod evita negativos</pre>
+<p>El polinomio de Horner usa todos los caracteres y los pondera por potencias distintas de 31, así que importa el
+orden de los dígitos. La mezcla se agregó después de medir (ver tabla): con Horner solo, CBA-0347 y CBA-0348 dan valores
+que difieren en 1 y caen en celdas vecinas, de modo que códigos correlativos forman bloques contiguos. Eso es
+agrupamiento primario fabricado por la propia función, y con exploración lineal los sondeos se disparaban hasta 3 veces
+por encima de la teoría. Multiplicar por una constante impar grande y combinar bits altos y bajos desparrama esos
+valores. El tamaño primo hace que el módulo use todos los bits del valor y es condición para la garantía de la cuadrática.</p>
+<h3>Umbrales elegidos</h3>
+<ul>
+  <li><b>Lineal: 0,5.</b> Una búsqueda fallida cuesta ½(1 + 1/(1−λ)²) sondeos: 2,5 con λ = 0,5, pero 8,5 con λ = 0,75 y
+  50,5 con λ = 0,9. Por el agrupamiento primario el costo crece muy rápido pasado 0,5.</li>
+  <li><b>Cuadrática: 0,5.</b> Con tamaño primo y λ ≤ 0,5 está demostrado que siempre se encuentra una celda libre. Por encima,
+  la inserción puede fallar aun con lugar (por seguridad, si recorre la tabla sin éxito se fuerza un rehashing).</li>
+  <li><b>Encadenamiento: 1,0.</b> Las listas no se llenan; con λ = 1 cada lista tiene en promedio un elemento.</li>
+</ul>
+<h3>Experimento obligatorio</h3>
+<p>10.000 estaciones simuladas, tamaño inicial 13. Las búsquedas exitosas buscan las 10.000 claves; como con 10.000
+estaciones se usan todos los códigos CBA-0000 a CBA-9999, las fallidas buscan 10.000 códigos <code>XYZ-NNNN</code>, que no existen.</p>
+<table>
+  <tr><th>Configuración</th><th class="n">Tamaño final</th><th class="n">λ</th><th class="n">Rehash</th><th class="n">Colisiones</th><th class="n">Sondeos éxito</th><th class="n">Sondeos fracaso</th><th class="n">Teórico éxito / fracaso</th></tr>
+  <tr><td>Lineal, umbral 0,5</td><td class="n">33.703</td><td class="n">0,297</td><td class="n">11</td><td class="n">7.707</td><td class="n">1,205</td><td class="n">1,494</td><td class="n">1,211 / 1,511</td></tr>
+  <tr><td>Cuadrática, umbral 0,5</td><td class="n">33.703</td><td class="n">0,297</td><td class="n">11</td><td class="n">6.546</td><td class="n">1,197</td><td class="n">1,451</td><td class="n">1,186 / 1,422</td></tr>
+  <tr><td>Encadenamiento, umbral 1,0 (opcional)</td><td class="n">16.843</td><td class="n">0,594</td><td class="n">10</td><td class="n">5.052</td><td class="n">1,302</td><td class="n">0,592</td><td class="n">1,297 / 0,594</td></tr>
+  <tr><td>Lineal, umbral 0,9</td><td class="n">16.843</td><td class="n">0,594</td><td class="n">10</td><td class="n">68.415</td><td class="n">1,789</td><td class="n">3,728</td><td class="n">1,731 / 3,529</td></tr>
+  <tr><td>Cuadrática, umbral 0,9</td><td class="n">16.843</td><td class="n">0,594</td><td class="n">10</td><td class="n">27.977</td><td class="n">1,600</td><td class="n">2,681</td><td class="n">1,517 / 2,461</td></tr>
+  <tr><td>Lineal 0,5, Horner <i>sin mezcla</i></td><td class="n">33.703</td><td class="n">0,297</td><td class="n">11</td><td class="n">18.585</td><td class="n">3,112</td><td class="n">2,339</td><td class="n">1,211 / 1,511</td></tr>
+  <tr><td>Lineal 0,9, Horner <i>sin mezcla</i></td><td class="n">16.843</td><td class="n">0,594</td><td class="n">10</td><td class="n">255.299</td><td class="n">2,202</td><td class="n">11,672</td><td class="n">1,731 / 3,529</td></tr>
+  <tr><td>Lineal 0,5, suma de caracteres</td><td class="n">33.703</td><td class="n">0,297</td><td class="n">11</td><td class="n">49.815.000</td><td class="n">4.982,5</td><td class="n">9.914,0</td><td class="n">—</td></tr>
+</table>
+<p class="peq">Teórico: lineal ½(1+1/(1−λ)) y ½(1+1/(1−λ)²); cuadrática ≈ −ln(1−λ)/λ y 1/(1−λ); encadenamiento 1+λ/2 y λ (nodos comparados).</p>
+<h3>Análisis</h3>
+<ul>
+  <li><b>Agrupamiento primario.</b> Con el mismo λ = 0,594, la lineal tiene 2,4 veces más colisiones que la cuadrática
+  (68.415 contra 27.977) y casi un 40 % más de sondeos en las búsquedas fallidas (3,73 contra 2,68). En la lineal, toda clave que
+  cae en cualquier celda de un bloque ocupado termina al final del bloque y lo agranda: los bloques crecen solos. La
+  cuadrática salta cada vez más lejos y no se pega al bloque. Con λ = 0,30 la diferencia casi no se nota, que es justamente
+  lo que busca el umbral 0,5.</li>
+  <li><b>Medido contra teoría.</b> Con la función final, los valores medidos coinciden con las fórmulas (por ejemplo 1,79
+  contra 1,73): la función reparte como se supone en el análisis.</li>
+  <li><b>La función importa tanto como la estrategia.</b> Sin la mezcla, la misma lineal con λ = 0,59 hace 11,7 sondeos
+  por búsqueda fallida en lugar de 3,7, y casi el triple de colisiones (255.299). La suma de caracteres solo puede dar 37 valores distintos para CBA-NNNN (la suma de
+  4 dígitos va de 0 a 36): 10.000 claves se apilan en 37 celdas y la tabla degenera en una búsqueda lineal (casi 5.000 sondeos).</li>
+  <li><b>Rehashings.</b> 11 con umbral 0,5 y 10 con 0,9: duplicar hace que el costo total de reinsertar sea O(n) amortizado.</li>
+</ul>
+
+<h2>3. M2 · Índice ordenado (ABB y AVL)</h2>
+<h3>Diseño</h3>
+<p>Una clase abstracta <code>ArbolBinarioBusqueda</code> contiene lo común: búsqueda, recorridos inorden, preorden y
+postorden, altura, cantidad de nodos y de hojas, consulta por rango y reporte de críticas. <code>ABB</code> y
+<code>AVL</code> definen inserción y eliminación. La clave es el número de estación.</p>
+<ul>
+  <li><b>Eliminación en los tres casos:</b> hoja (se quita), un hijo (el hijo ocupa su lugar) y dos hijos (se reemplaza
+  por el sucesor inorden, el mínimo del subárbol derecho, y se elimina ese mínimo, que tiene a lo sumo un hijo).</li>
+  <li><b>AVL:</b> cada nodo guarda su altura. Al volver de la recursión de inserción o eliminación se recalcula el factor de
+  equilibrio <code>fe = altura(izq) − altura(der)</code>. Si vale 2 y el hijo izquierdo tiene fe ≥ 0, rotación simple a
+  derecha (caso izquierda-izquierda); si el hijo tiene fe &lt; 0, rotación doble izquierda-derecha. Simétrico para −2.</li>
+  <li><b>Métodos recursivos y casos base:</b> <code>altura</code> → árbol vacío vale −1; <code>cantidadNodos</code> → árbol
+  vacío vale 0; <code>cantidadHojas</code> → árbol vacío vale 0 y nodo sin hijos vale 1. Están marcados en el código.</li>
+  <li><b>Rango [A, B]:</b> inorden podado: no baja a la izquierda si la clave ya es ≤ A ni a la derecha si ya es ≥ B.
+  Cuesta O(h + k), con k resultados.</li>
+  <li><b>Críticas:</b> la batería no es la clave, así que no se puede podar: se recorre todo en inorden (O(n)) y salen
+  ordenadas por número. Con la red de 10.000 estaciones hay 1.950 críticas (≈ 20 %, lo esperable con batería uniforme).</li>
+</ul>
+<div class="nota"><b>Recursión con el ABB degenerado.</b> Con claves ordenadas el ABB es una lista de 10.000 niveles. La
+inserción y la búsqueda del ABB son iterativas, y el programa corre en un hilo con 512 MB de pila para que los métodos
+recursivos (altura, recorridos, eliminar) no produzcan <code>StackOverflowError</code>. Es el mismo problema que el
+enunciado señala para Python (<code>RecursionError</code>), resuelto de las dos maneras.</div>
+<h3>Experimento obligatorio</h3>
+<table>
+  <tr><th>Orden</th><th class="n">N</th><th class="n">Altura ABB</th><th class="n">Altura AVL</th><th class="n">log2 N</th><th class="n">Búsqueda prom. ABB</th><th class="n">Búsqueda prom. AVL</th><th class="n">Inserción total ABB</th><th class="n">Inserción total AVL</th></tr>
+  <tr><td>Ascendente</td><td class="n">1.000</td><td class="n">999</td><td class="n">9</td><td class="n">9,97</td><td class="n">556 ns</td><td class="n">55 ns</td><td class="n">5,3 ms</td><td class="n">0,4 ms</td></tr>
+  <tr><td>Ascendente</td><td class="n">5.000</td><td class="n">4.999</td><td class="n">12</td><td class="n">12,29</td><td class="n">2.851 ns</td><td class="n">81 ns</td><td class="n">19,6 ms</td><td class="n">0,7 ms</td></tr>
+  <tr><td>Ascendente</td><td class="n">10.000</td><td class="n">9.999</td><td class="n">13</td><td class="n">13,29</td><td class="n">5.548 ns</td><td class="n">79 ns</td><td class="n">56,7 ms</td><td class="n">1,7 ms</td></tr>
+  <tr><td>Aleatorio</td><td class="n">1.000</td><td class="n">19</td><td class="n">11</td><td class="n">9,97</td><td class="n">11 ns</td><td class="n">11 ns</td><td class="n">0,06 ms</td><td class="n">0,21 ms</td></tr>
+  <tr><td>Aleatorio</td><td class="n">5.000</td><td class="n">25</td><td class="n">13</td><td class="n">12,29</td><td class="n">45 ns</td><td class="n">49 ns</td><td class="n">0,36 ms</td><td class="n">0,60 ms</td></tr>
+  <tr><td>Aleatorio</td><td class="n">10.000</td><td class="n">28</td><td class="n">15</td><td class="n">13,29</td><td class="n">61 ns</td><td class="n">62 ns</td><td class="n">1,02 ms</td><td class="n">2,00 ms</td></tr>
+</table>
+<p class="peq">Altura en aristas (una hoja sola tiene altura 0). Búsqueda promedio: se buscan todas las claves y se divide el mejor de 3 tiempos por N.</p>
+<h3>Análisis</h3>
+<ul>
+  <li><b>Orden ascendente (el caso real del censo):</b> el ABB degenera en una lista; la altura es N − 1 y buscar es O(n).
+  Con 10.000 estaciones cada búsqueda tarda 70 veces más que en el AVL, y construir el ABB es O(n²): 56,7 ms contra 1,7 ms.</li>
+  <li><b>El AVL con claves ordenadas queda casi perfecto</b> (altura 13 = ⌊log2 10.000⌋): cada inserción al final dispara
+  una rotación simple que mantiene el árbol lleno. Siempre se cumple la cota altura &lt; 1,44·log2(N+2).</li>
+  <li><b>Orden aleatorio:</b> el ABB queda razonable (altura 28, unas 2,1·log2 N, como predice el análisis del caso
+  promedio, ≈ 1,39·log2 N de profundidad media) y busca tan rápido como el AVL. Insertar en el AVL cuesta más (recalcular
+  alturas y rotar), pero el AVL garantiza O(log n) sin depender del orden de llegada, que es lo que no controlamos.</li>
+</ul>
+
+<h2>4. M3 · Red vial y planificación de recorridos</h2>
+<h3>Representación</h3>
+<p>El grafo se carga desde <code>datos/rutas.txt</code> (líneas <code>localidad;localidad;km</code>) y se construyen
+las dos representaciones. Los algoritmos usan la interfaz <code>Grafo</code>, así que corren igual sobre cualquiera
+(desde el menú se cambia cuál usan). Las listas de adyacencia se mantienen ordenadas por índice de destino para que BFS
+y DFS visiten los vecinos en el mismo orden que con la matriz y den resultados idénticos.</p>
+<table>
+  <tr><th></th><th>Matriz de adyacencia</th><th>Lista de adyacencia</th></tr>
+  <tr><td>Memoria</td><td>V² = 144 celdas (36 con tramo, 75 % vacío)</td><td>V + 2E = 12 + 36 nodos</td></tr>
+  <tr><td>¿Hay tramo u–v?</td><td>O(1)</td><td>O(grado)</td></tr>
+  <tr><td>Recorrer vecinos</td><td>O(V) por vértice → BFS/DFS O(V²)</td><td>O(grado) → BFS/DFS O(V + E)</td></tr>
+</table>
+<p><b>Conviene la lista</b>: la red es rala (18 de 66 tramos posibles, 27 %) y BFS, DFS y Dijkstra solo recorren vecinos.
+La matriz encaja naturalmente con Floyd, que de todos modos llena una matriz V×V. Con 12 localidades ambas son
+instantáneas; la diferencia aparecería con una red de miles de localidades con pocas rutas cada una.</p>
+<h3>BFS desde la base (Villa María)</h3>
+<table>
+  <tr><th>Tramos</th><th>Localidades</th></tr>
+  <tr><td>1</td><td>Córdoba, Río Tercero, San Francisco, Río Cuarto</td></tr>
+  <tr><td>2</td><td>Villa Carlos Paz, Alta Gracia, Jesús María, Villa Dolores</td></tr>
+  <tr><td>3</td><td>Cosquín, Deán Funes</td></tr>
+  <tr><td>4 (fuera del pedido)</td><td>La Falda</td></tr>
+</table>
+<p>BFS usa una cola propia sobre un arreglo de tamaño V (cada vértice entra una sola vez) y cuenta tramos, no km: por eso
+Río Cuarto está «a 1» (130 km) y Villa Carlos Paz «a 2» (182 km), mientras que San Francisco, también a 1 tramo, está a 150 km.</p>
+<h3>DFS: conexidad y corte de rutas</h3>
+<p>Un DFS recursivo desde cualquier vértice visita las 12 localidades: la red es conexa. El programa prueba cortar cada
+uno de los 18 tramos por separado y en ningún caso queda una localidad aislada: la red <b>no tiene puentes</b>
+(todo tramo está en algún ciclo). Para aislar una localidad hacen falta dos cortes; por ejemplo, Villa Dolores tiene
+solo dos tramos (Villa Carlos Paz y Río Cuarto) y, si se cortan ambos, el DFS desde la base deja de alcanzarla.
+San Francisco está en la misma situación (Córdoba y Villa María).</p>
+<h3>Dijkstra</h3>
+<p>Versión con arreglos, O(V²): en cada paso fija el vértice no fijado de menor distancia y relaja sus tramos. Con 12
+vértices es más simple que con un heap e igual de rápido. Se guarda el previo de cada vértice para reconstruir el camino.
+Control con Córdoba: Río Cuarto a 212 km (Córdoba → Río Tercero → Río Cuarto), Villa Dolores a 176 km (por Villa Carlos Paz).</p>
+<table>
+  <tr><th>Destino</th><th class="n">km</th><th>Camino desde Villa María</th></tr>
+  <tr><td>Río Tercero</td><td class="n">70</td><td>Villa María → Río Tercero</td></tr>
+  <tr><td>Río Cuarto</td><td class="n">130</td><td>Villa María → Río Cuarto</td></tr>
+  <tr><td>Córdoba</td><td class="n">146</td><td>Villa María → Córdoba</td></tr>
+  <tr><td>San Francisco</td><td class="n">150</td><td>Villa María → San Francisco</td></tr>
+  <tr><td>Alta Gracia</td><td class="n">155</td><td>Villa María → Río Tercero → Alta Gracia</td></tr>
+  <tr><td>Villa Carlos Paz</td><td class="n">182</td><td>Villa María → Córdoba → Villa Carlos Paz</td></tr>
+  <tr><td>Jesús María</td><td class="n">197</td><td>Villa María → Córdoba → Jesús María</td></tr>
+  <tr><td>Cosquín</td><td class="n">206</td><td>Villa María → Córdoba → Villa Carlos Paz → Cosquín</td></tr>
+  <tr><td>La Falda</td><td class="n">226</td><td>… → Villa Carlos Paz → Cosquín → La Falda</td></tr>
+  <tr><td>Deán Funes</td><td class="n">267</td><td>Villa María → Córdoba → Jesús María → Deán Funes</td></tr>
+  <tr><td>Villa Dolores</td><td class="n">322</td><td>Villa María → Córdoba → Villa Carlos Paz → Villa Dolores</td></tr>
+</table>
+<p>Ejemplo de por qué no alcanza con mirar pocos tramos: a Villa Dolores se llega en dos tramos pasando por Río Cuarto
+(130 + 210 = 340 km), pero el camino mínimo usa tres tramos, por Córdoba y Villa Carlos Paz, y suma 322 km. Y a Alta Gracia
+conviene ir por Río Tercero (155 km) y no por Córdoba (146 + 39 = 185 km), aunque Córdoba esté más cerca a un tramo.</p>
+<h3>Floyd</h3>
+<p>Tres ciclos anidados, O(V³) = 1.728 pasos: después de la iteración k, <code>d[i][j]</code> es el mínimo usando como
+intermedios solo las localidades 0..k. Una matriz <code>siguiente[i][j]</code> guarda el primer paso para reconstruir
+caminos. Coincide con Dijkstra en todas las filas comprobadas (Córdoba y Villa María).</p>
+<pre>       Cba  VCP   AG   JM   RT   VM   SF  Cos   LF   RC   DF   VD
+Cba      0   36   39   51  102  146  205   60   80  212  121  176
+VCP     36    0   35   87  120  182  241   24   44  230  139  140
+AG      39   35    0   90   85  155  244   59   79  195  160  175
+JM      51   87   90    0  153  197  256  111  131  263   70  227
+RT     102  120   85  153    0   70  220  144  164  110  223  260
+VM     146  182  155  197   70    0  150  206  226  130  267  322
+SF     205  241  244  256  220  150    0  265  285  280  326  381
+Cos     60   24   59  111  144  206  265    0   20  254  115  164
+LF      80   44   79  131  164  226  285   20    0  274   95  184
+RC     212  230  195  263  110  130  280  254  274    0  333  210
+DF     121  139  160   70  223  267  326  115   95  333    0  279
+VD     176  140  175  227  260  322  381  164  184  210  279    0</pre>
+<h3>Plan de visitas</h3>
+<p>Con la red de 10.000 estaciones, las 12 localidades tienen estaciones críticas. Vecino más cercano sobre la tabla de
+Floyd, saliendo y volviendo a Villa María:</p>
+<pre>Villa María → Río Tercero (70) → Alta Gracia (85) → Villa Carlos Paz (35) → Cosquín (24) → La Falda (20)
+→ Córdoba (80) → Jesús María (51) → Deán Funes (70) → Villa Dolores (279) → Río Cuarto (210)
+→ San Francisco (280) → Villa María (150)                                        Total: 1.354 km</pre>
+<p>Para medir qué tan lejos queda, el programa calcula también el recorrido óptimo con programación dinámica sobre
+subconjuntos (Held-Karp, O(2^k·k²), viable solo porque k = 11): <b>1.215 km</b>
+(Villa María → San Francisco → Córdoba → Jesús María → Deán Funes → La Falda → Cosquín → Alta Gracia → Villa Carlos Paz
+→ Villa Dolores → Río Cuarto → Río Tercero → Villa María). <b>El vecino más cercano hace 139 km más (11,4 %).</b></p>
+<p><b>Por qué no garantiza el óptimo:</b> es un algoritmo goloso. En cada paso elige lo más cercano desde donde está sin
+considerar lo que falta. Sale hacia el oeste por los tramos cortos (Río Tercero, Alta Gracia, Villa Carlos Paz, Cosquín) y
+deja para el final las localidades de los extremos: desde Deán Funes tiene que cruzar a Villa Dolores (279 km), bajar a Río
+Cuarto y atravesar la provincia hasta San Francisco (280 km). Los cuatro últimos tramos suman 919 km. El óptimo empieza por
+San Francisco, que está a 150 km de la base, y recorre el anillo sin volver sobre sus pasos. Encontrar el óptimo es el
+problema del viajante, que no tiene algoritmo eficiente conocido: con 30 localidades Held-Karp necesitaría unos
+2^30·30² ≈ 10¹² pasos. Con menos localidades la diferencia baja pero no desaparece: con 30 estaciones hay 5 localidades
+críticas y el vecino más cercano hace 1.131 km contra 1.077 del óptimo (5 %).</p>
+
+<h2>5. M4 · Transmisión comprimida (Huffman)</h2>
+<h3>Diseño</h3>
+<p>Sigue la estructura de la lectura: clase <code>Nodo</code> (símbolo, frecuencia, hijos; comparable por frecuencia),
+<code>construirArbolHuffman</code> (una hoja por símbolo en una <code>PriorityQueue</code>; se sacan los dos de menor
+frecuencia y se unen bajo un padre con la suma, hasta que queda uno), <code>codificar</code> (recorre el árbol: 0 a la
+izquierda, 1 a la derecha; la tabla queda en un <code>HashMap</code>) y <code>decodificar</code> (baja bit a bit desde la
+raíz y, al llegar a una hoja, emite el símbolo y vuelve a la raíz). Para frecuencias iguales se desempata por orden de
+creación, así el árbol es siempre el mismo. Con un solo símbolo distinto se le agrega un padre para que su código sea «0».</p>
+<p>Además del cálculo en bits, <code>ArchivoHuffman</code> escribe el archivo comprimido real (.huf): tabla de frecuencias,
+cantidad de bits y los bits empaquetados de a 8 por byte. El receptor reconstruye el mismo árbol con las frecuencias.</p>
+<h3>Caso de verificación</h3>
+<p><code>WWXWYZWX</code>: W = 4, X = 2, Y = 1, Z = 1 → códigos W = 0, X = 10, Y = 110, Z = 111.
+Codificado: <code>00100110111010</code>, <b>14 bits</b> contra 64 con 8 bits fijos. Decodificado idéntico. ✔</p>
+<h3>Archivo de mediciones (5.000 líneas)</h3>
+<table>
+  <tr><th>Medida</th><th class="n">Valor</th></tr>
+  <tr><td>Caracteres / tamaño original (8 bits por carácter)</td><td class="n">254.642 / 2.037.136 bits</td></tr>
+  <tr><td>Tamaño comprimido (bits de datos)</td><td class="n">1.071.484 bits</td></tr>
+  <tr><td>Bits promedio por carácter</td><td class="n">4,21</td></tr>
+  <tr><td>Tasa de compresión</td><td class="n">52,6 % del original (ahorro 47,4 %)</td></tr>
+  <tr><td>Archivo .huf real, con la tabla de frecuencias</td><td class="n">134.080 bytes (52,7 %)</td></tr>
+  <tr><td>Símbolos distintos / códigos libres de prefijo</td><td class="n">22 / sí</td></tr>
+  <tr><td>Descomprimido desde el .huf idéntico al original</td><td class="n">sí</td></tr>
+</table>
+<p>Los más frecuentes reciben 3 bits (<code>;</code> 30.000 veces, <code>0</code> 28.112, <code>1</code> 25.906) y los menos
+frecuentes 6 (<code>\n</code>, <code>:</code>, <code>C</code>, <code>H</code>, 5.000 veces cada uno).</p>
+<h3>¿Por qué se comprime bastante pero no tanto como un texto con muchos repetidos?</h3>
+<p>Huffman gana cuando las frecuencias son muy desiguales: los símbolos muy frecuentes reciben códigos muy cortos.
+El archivo de mediciones tiene 22 símbolos con frecuencias bastante parejas: los 10 dígitos aparecen entre 5.600 y 28.000
+veces, y la estructura fija de cada línea (<code>CBA-</code>, <code>;T=</code>, <code>;H=</code>, …) reparte los separadores
+en cantidades similares. Con 22 símbolos casi equiprobables el mínimo sería log2 22 ≈ 4,46 bits por carácter; Huffman logra
+4,21 porque hay algo de desigualdad (el <code>;</code> y los dígitos 0, 1 y 2 de las fechas dominan), pero no mucho más.
+En <code>WWXWYZWX</code>, en cambio, la mitad de los caracteres son W y se codifican con 1 bit: 1,75 bits por carácter
+(78 % de ahorro). Además Huffman codifica cada carácter por separado: no aprovecha que <code>CBA-</code> o la fecha se
+repiten idénticas en todas las líneas, algo que sí explotan los compresores por diccionario.</p>
+
+<h2>6. M5 · Guardias rotativas (Josephus)</h2>
+<ul>
+  <li><b>Simple, O(N·M):</b> <code>LinkedList</code> con los técnicos 1..N y un <code>Iterator</code>. Para cada eliminación
+  se avanza M + 1 posiciones (si se termina la lista, se pide un iterador nuevo: la ronda es circular) y se llama a
+  <code>remove()</code>, que es O(1) porque el iterador ya está sobre el nodo.</li>
+  <li><b>Eficiente, O(N log N):</b> no camina M pasos: calcula la posición del próximo eliminado,
+  <code>rango = (rango + M) mod quedan</code> (0 equivale a «quedan»), y la busca en un ABB donde cada nodo guarda el tamaño
+  de su subárbol. Así el k-ésimo se encuentra y se elimina en O(altura). El árbol se arma balanceado con 1..N (altura
+  ≈ log2 N) y las eliminaciones solo pueden achicar la altura.</li>
+</ul>
+<p><b>Caso de verificación:</b> N = 5, M = 1 → salen 2, 4, 1, 5 y queda el 3, con las dos implementaciones. ✔</p>
+<h3>Calendario (N = 12, M = 2)</h3>
+<pre>Ronda: 1.Ana 2.Bruno 3.Carla 4.Diego 5.Elena 6.Facundo 7.Gabriela 8.Hernán 9.Inés 10.Julián 11.Karina 12.Lucas
+Fin de semana 1 → Carla · 2 → Facundo · 3 → Inés · 4 → Lucas · 5 → Diego · 6 → Hernán · 7 → Ana
+· 8 → Gabriela · 9 → Bruno · 10 → Karina · 11 → Elena · Suplente de emergencias: Julián</pre>
+<p>Es justo porque la regla es fija y pública, no depende de nadie, y verificable porque cualquiera puede repetir la ronda
+a mano y llegar al mismo calendario.</p>
+<h3>Experimento obligatorio</h3>
+<table>
+  <tr><th class="n">N</th><th class="n">M</th><th class="n">Lista O(N·M)</th><th class="n">Árbol O(N log N)</th><th class="n">Lista / árbol</th></tr>
+  <tr><td class="n">1.000</td><td class="n">2</td><td class="n">0,25 ms</td><td class="n">0,09 ms</td><td class="n">2,7</td></tr>
+  <tr><td class="n">10.000</td><td class="n">2</td><td class="n">0,58 ms</td><td class="n">1,00 ms</td><td class="n">0,6</td></tr>
+  <tr><td class="n">100.000</td><td class="n">2</td><td class="n">2,7 ms</td><td class="n">5,5 ms</td><td class="n">0,5</td></tr>
+  <tr><td class="n">1.000</td><td class="n">100</td><td class="n">0,36 ms</td><td class="n">0,05 ms</td><td class="n">7,0</td></tr>
+  <tr><td class="n">10.000</td><td class="n">100</td><td class="n">2,0 ms</td><td class="n">0,63 ms</td><td class="n">3,2</td></tr>
+  <tr><td class="n">100.000</td><td class="n">100</td><td class="n">30,7 ms</td><td class="n">10,2 ms</td><td class="n">3,0</td></tr>
+  <tr><td class="n">1.000</td><td class="n">1.000</td><td class="n">3,7 ms</td><td class="n">0,04 ms</td><td class="n">93,9</td></tr>
+  <tr><td class="n">10.000</td><td class="n">1.000</td><td class="n">20,2 ms</td><td class="n">0,66 ms</td><td class="n">30,4</td></tr>
+  <tr><td class="n">100.000</td><td class="n">1.000</td><td class="n">281,6 ms</td><td class="n">10,0 ms</td><td class="n">28,1</td></tr>
+</table>
+<p><b>Cuándo importa la diferencia.</b> El costo de la lista es proporcional a N·M; el del árbol, a N·log N y no depende
+de M. Con M chico (nuestro M = 2) la lista hace muy poco trabajo por eliminación y, salvo con N chico, gana, porque cada
+paso del árbol es más caro (recursión, actualizar tamaños). A medida que M crece la lista se vuelve proporcionalmente más
+lenta y el árbol no cambia: con M = 1.000 el árbol es entre 28 y 94 veces más rápido. Con N = 100.000 y M = 1.000 la lista recorre unos 10⁸ nodos
+(283 ms); con M = N sería del orden de 10¹⁰ y ya no sería práctico. Para 12 técnicos cualquiera de las dos es instantánea.</p>
+
+<h2>7. M6 · Simulación y pruebas</h2>
+<ul>
+  <li><b>Generación reproducible:</b> todo sale de <code>new Random(semilla del grupo)</code>. Los números de estación se
+  obtienen mezclando 0..9999 con Fisher-Yates parcial (sin repetidos, O(n)); localidad, tipo, batería (0..100) y días sin
+  visita (0..180), con <code>nextInt</code>. Correr dos veces el programa da exactamente los mismos resultados.</li>
+  <li><b>secuenciasIguales / secuenciasDistintas:</b> dos generadores con semilla 2026 producen los mismos 1.000 valores
+  (97, 96, 26, 54, 36, …); con 2027 la secuencia es otra (27, 63, 22, 23, 3, …).</li>
+  <li><b>Uniformidad:</b> 1.000.000 de baterías. Esperado por valor: 9.901. Por intervalos de 10 el desvío máximo es
+  0,50 %; por valor, 2,35 %. Chi-cuadrado = 84,15 con 100 grados de libertad; el crítico al 5 % es 124,34, así que no hay
+  evidencia contra la uniformidad.</li>
+  <li><b>Tiempos:</b> <code>System.nanoTime</code>. Antes de medir se hace una pasada de calentamiento (la JVM compila el
+  código caliente sobre la marcha) y se toma el mejor de 3 a 5 repeticiones, que es el menos afectado por el recolector
+  de basura y otros procesos. El informe se guarda en <code>resultados/informe_rendimiento_grupoN.txt</code>.</li>
+</ul>
+
+<h2>8. Complejidad de las operaciones principales</h2>
+<table>
+  <tr><th>Estructura / algoritmo</th><th>Operación</th><th>Promedio</th><th>Peor caso</th></tr>
+  <tr><td>Tabla hash (abierta)</td><td>insertar, buscar, eliminar</td><td>O(1) con λ acotado</td><td>O(n)</td></tr>
+  <tr><td>Tabla hash</td><td>rehashing</td><td>O(n), O(1) amortizado por inserción</td><td>O(n)</td></tr>
+  <tr><td>ABB</td><td>insertar, buscar, eliminar</td><td>O(log n)</td><td>O(n) (claves ordenadas)</td></tr>
+  <tr><td>AVL</td><td>insertar, buscar, eliminar</td><td>O(log n)</td><td>O(log n)</td></tr>
+  <tr><td>ABB / AVL</td><td>recorridos, altura, nodos, hojas, críticas</td><td>O(n)</td><td>O(n)</td></tr>
+  <tr><td>ABB / AVL</td><td>rango [A, B] con k resultados</td><td>O(log n + k)</td><td>O(n) en ABB</td></tr>
+  <tr><td>BFS, DFS</td><td>lista / matriz</td><td colspan="2">O(V + E) / O(V²)</td></tr>
+  <tr><td>Dijkstra (arreglos)</td><td>desde un origen</td><td colspan="2">O(V²)</td></tr>
+  <tr><td>Floyd</td><td>todos los pares</td><td colspan="2">O(V³)</td></tr>
+  <tr><td>Vecino más cercano / Held-Karp</td><td>k localidades</td><td colspan="2">O(k²) / O(2^k·k²)</td></tr>
+  <tr><td>Huffman</td><td>construir árbol (σ símbolos) / codificar texto de n caracteres</td><td colspan="2">O(σ log σ) / O(n)</td></tr>
+  <tr><td>Josephus</td><td>lista + iterador / árbol con rangos</td><td colspan="2">O(N·M) / O(N log N)</td></tr>
+</table>
+
+<h2>9. Casos de verificación</h2>
+<table>
+  <tr><th>Caso</th><th>Esperado</th><th>Obtenido</th></tr>
+  <tr><td>Huffman WWXWYZWX</td><td>64 bits → 14 bits</td><td>14 bits, decodificado idéntico ✔</td></tr>
+  <tr><td>Josephus N = 5, M = 1</td><td>salen 2, 4, 1, 5; queda 3</td><td>[2, 4, 1, 5, 3] con ambas implementaciones ✔</td></tr>
+  <tr><td>Dijkstra desde Córdoba (control)</td><td>caminos mínimos de la tabla</td><td>coincide con Floyd y con el cálculo a mano ✔</td></tr>
+  <tr><td>Matriz contra lista</td><td>mismos resultados</td><td>Dijkstra idéntico con ambas ✔</td></tr>
+  <tr><td>Inorden del AVL con 10.000 claves</td><td>estrictamente creciente</td><td>sí ✔</td></tr>
+  <tr><td>Baja y alta en tabla hash + AVL</td><td>la baja deja de encontrarse; el alta vuelve a aparecer</td><td>sí, reutilizando la celda borrada ✔</td></tr>
+  <tr><td>Archivo .huf</td><td>descomprimido = original</td><td>sí, byte a byte ✔</td></tr>
+  <tr><td>Semillas</td><td>misma semilla, misma secuencia</td><td>sí ✔</td></tr>
+</table>
+
+<h2>10. Conclusiones</h2>
+<ul>
+  <li><b>No hay una estructura mejor en general, sino una mejor para cada pregunta.</b> La tabla hash responde «¿dónde está
+  este código?» en 1 a 2 sondeos, y el AVL responde «¿cuáles hay entre 340 y 350?» y «¿cuáles están críticas, en orden?».
+  RedSens mantiene las dos.</li>
+  <li><b>Lo que dice la teoría se ve en los números</b>, siempre que la implementación respete los supuestos: el
+  agrupamiento primario aparece con exploración lineal y λ alto, el ABB degenera con datos ordenados exactamente como el
+  censo los entrega, y Josephus con lista crece con M mientras que con árbol no.</li>
+  <li><b>Medir sirve para encontrar errores de diseño.</b> La primera función hash parecía razonable y pasaba todas las
+  pruebas funcionales, pero los sondeos medidos no coincidían con la fórmula. Esa diferencia llevó a encontrar que Horner
+  solo deja juntos los códigos correlativos.</li>
+  <li><b>Una heurística rápida no es una solución óptima.</b> El vecino más cercano arma el plan en microsegundos, pero en
+  este caso recorre 139 km (11 %) más que el óptimo. Para 12 localidades se puede calcular el óptimo; para la red completa de la
+  provincia habría que aceptar una heurística y mejorarla.</li>
+  <li><b>Huffman depende de la distribución de los símbolos.</b> Con frecuencias parejas el ahorro ronda el 47 %; con un
+  símbolo dominante, como en WWXWYZWX, llega al 78 %.</li>
+</ul>
+</body>
+</html>
