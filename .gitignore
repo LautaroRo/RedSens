@@ -1,0 +1,8 @@
+out/
+*.class
+.idea/
+*.iml
+
+# Se entrega en el .zip de la materia, no va al repositorio
+docs/bitacora_ia.*
+.vscode/
